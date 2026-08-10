@@ -1,0 +1,7 @@
+.git
+.env
+build
+*.o
+*.a
+*.so
+*.swp

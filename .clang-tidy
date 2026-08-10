@@ -1,0 +1,12 @@
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  cert-*,
+  clang-analyzer-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  misc-const-correctness,
+  performance-*
+WarningsAsErrors: '*'
+HeaderFilterRegex: '^(include|src)/portal_api/.*'
+FormatStyle: file

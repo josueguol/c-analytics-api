@@ -1,0 +1,33 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-portal_activity}
+      POSTGRES_USER: ${POSTGRES_USER:-portal_api}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-portal_api}:${POSTGRES_PASSWORD:-change-me-in-production}@db:5432/${POSTGRES_DB:-portal_activity}
+      PORT: 8080
+      TOKEN_TTL_HOURS: ${TOKEN_TTL_HOURS:-168}
+      CONFIRMATION_TTL_HOURS: ${CONFIRMATION_TTL_HOURS:-24}
+      EXPOSE_CONFIRMATION_TOKEN: ${EXPOSE_CONFIRMATION_TOKEN:-true}
+    ports:
+      - "${API_HOST_PORT:-8080}:8080"
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

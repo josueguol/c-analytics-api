@@ -1,0 +1,25 @@
+# Build outputs
+/build/
+/cmake-build-*/
+CMakeCache.txt
+CMakeFiles/
+CTestTestfile.cmake
+compile_commands.json
+Testing/
+
+# Local configuration and editor files
+.env
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Native build outputs
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dylib
+*.dll
+*.exe
