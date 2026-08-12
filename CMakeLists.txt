@@ -30,9 +30,28 @@ set(PORTAL_API_SOURCES
     src/validation/validation.c
 )
 
+# Flags comunes a todos los targets: sin listas ni bloques duplicados (AGENTS.md 47).
+add_library(portal_common_flags INTERFACE)
+
+if(UNIX)
+    target_compile_definitions(portal_common_flags INTERFACE _POSIX_C_SOURCE=200809L)
+endif()
+
+if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+    target_compile_options(portal_common_flags INTERFACE -Wall -Wextra -Wpedantic -Werror)
+    if(PORTAL_ENABLE_SANITIZERS)
+        # Compilación y enlace: instrumentar sólo al enlazar no detecta nada.
+        target_compile_options(portal_common_flags INTERFACE
+            -fno-omit-frame-pointer -fsanitize=address,undefined
+        )
+        target_link_options(portal_common_flags INTERFACE -fsanitize=address,undefined)
+    endif()
+endif()
+
 add_library(portal_api_core STATIC ${PORTAL_API_SOURCES})
 target_include_directories(portal_api_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 target_link_libraries(portal_api_core PRIVATE
+    portal_common_flags
     PkgConfig::MICROHTTPD
     PkgConfig::LIBPQ
     PkgConfig::JSON_C
@@ -40,22 +59,7 @@ target_link_libraries(portal_api_core PRIVATE
 
 add_executable(portal_api src/main.c)
 set_target_properties(portal_api PROPERTIES OUTPUT_NAME "portal-api")
-target_link_libraries(portal_api PRIVATE portal_api_core)
-
-if(UNIX)
-    target_compile_definitions(portal_api_core PRIVATE _POSIX_C_SOURCE=200809L)
-endif()
-
-if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(portal_api_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    target_compile_options(portal_api PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    if(PORTAL_ENABLE_SANITIZERS)
-        target_compile_options(portal_api_core PRIVATE
-            -fno-omit-frame-pointer -fsanitize=address,undefined
-        )
-        target_link_options(portal_api PRIVATE -fsanitize=address,undefined)
-    endif()
-endif()
+target_link_libraries(portal_api PRIVATE portal_common_flags portal_api_core)
 
 if(PORTAL_ENABLE_CLANG_TIDY)
     find_program(PORTAL_CLANG_TIDY_EXECUTABLE NAMES clang-tidy REQUIRED)
@@ -67,30 +71,18 @@ endif()
 enable_testing()
 
 add_executable(portal_validation_tests tests/test_validation.c)
-target_link_libraries(portal_validation_tests PRIVATE portal_api_core)
-if(CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-    target_compile_options(portal_validation_tests PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    if(PORTAL_ENABLE_SANITIZERS)
-        target_compile_options(portal_validation_tests PRIVATE
-            -fno-omit-frame-pointer -fsanitize=address,undefined
-        )
-        target_link_options(portal_validation_tests PRIVATE -fsanitize=address,undefined)
-    endif()
-endif()
+target_link_libraries(portal_validation_tests PRIVATE portal_common_flags portal_api_core)
 add_test(NAME portal_validation_tests COMMAND portal_validation_tests)
 
 find_program(PORTAL_CLANG_FORMAT_EXECUTABLE NAMES clang-format)
 if(PORTAL_CLANG_FORMAT_EXECUTABLE)
-    set(PORTAL_FORMAT_FILES
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/main.c
-        ${PORTAL_API_SOURCES}
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/http/http_internal.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/portal_api/app.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/portal_api/config.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/portal_api/database.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/portal_api/http.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/portal_api/validation.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_validation.c
+    # Se descubren solas: agregar un archivo no exige actualizar una lista aparte.
+    file(GLOB_RECURSE PORTAL_FORMAT_FILES CONFIGURE_DEPENDS
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.c
+        ${CMAKE_CURRENT_SOURCE_DIR}/tests/*.h
     )
     add_custom_target(format
         COMMAND ${PORTAL_CLANG_FORMAT_EXECUTABLE} -i ${PORTAL_FORMAT_FILES}

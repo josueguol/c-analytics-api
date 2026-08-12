@@ -46,6 +46,35 @@ integración completa se ejecuta con:
 ./tests/smoke_api.sh
 ```
 
+### Desarrollo en Windows
+
+El servicio es Linux-only: no se compila de forma nativa en Windows. El host
+Windows trabaja mediante WSL2, y el repositorio puede quedarse en su ruta
+Windows habitual (visible como `/mnt/c/...` dentro de la distro).
+
+Preparar la distro una sola vez:
+
+```powershell
+wsl -d Ubuntu -e bash -lc "cd /mnt/c/Users/Looper/Documents/desarrollos/c-analytics-api && ./scripts/setup-wsl.sh"
+```
+
+Uso diario desde PowerShell:
+
+```powershell
+wsl -d Ubuntu -e bash -lc "cd /mnt/c/Users/Looper/Documents/desarrollos/c-analytics-api && ./scripts/check.sh"
+```
+
+Si prefiere no instalar nada en la distro, la misma verificación corre dentro de
+un contenedor con el código montado:
+
+```powershell
+docker compose --profile dev run --rm dev
+```
+
+Los finales de línea deben permanecer en LF: `.gitattributes` lo garantiza pese
+a `core.autocrlf=true`. Un script guardado con CRLF falla en WSL y en Docker con
+`bad interpreter: /bin/sh^M`. Verificarlo con `git ls-files --eol scripts tests db`.
+
 La primera inicialización de PostgreSQL ejecuta `db/init.sql`. Para reiniciar por completo los datos de desarrollo, ejecute `docker compose down -v` (esto elimina el volumen de la base).
 
 ## Autenticación y confirmación

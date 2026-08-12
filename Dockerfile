@@ -1,4 +1,6 @@
-FROM debian:bookworm-slim AS build
+# Etapa reutilizable: solo herramientas. La usa la compilacion de produccion y
+# tambien el servicio "dev" de docker-compose, que monta el codigo en /app.
+FROM debian:bookworm-slim AS toolchain
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends build-essential clang clang-format \
@@ -6,8 +8,10 @@ RUN apt-get update \
        libmicrohttpd-dev libpq-dev libjson-c-dev \
     && rm -rf /var/lib/apt/lists/*
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libclang-rt-14-dev valgrind \
+    && apt-get install -y --no-install-recommends libclang-rt-14-dev valgrind curl jq \
     && rm -rf /var/lib/apt/lists/*
+
+FROM toolchain AS build
 
 WORKDIR /app
 COPY CMakeLists.txt ./

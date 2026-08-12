@@ -1,0 +1,19 @@
+# El servicio es Linux-only y se compila desde WSL2 o desde un contenedor:
+# todo archivo de texto debe quedar con LF tambien en el working tree de Windows.
+# Los atributos ganan sobre core.autocrlf, asi que no hace falta configuracion local.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.c    text eol=lf
+*.h    text eol=lf
+*.sql  text eol=lf
+*.yml  text eol=lf
+*.yaml text eol=lf
+*.md   text eol=lf
+CMakeLists.txt text eol=lf
+Dockerfile     text eol=lf
+Makefile       text eol=lf
+
+*.png binary
+*.jpg binary
+*.ico binary

@@ -8,5 +8,5 @@ Checks: >
   misc-const-correctness,
   performance-*
 WarningsAsErrors: '*'
-HeaderFilterRegex: '^(include|src)/portal_api/.*'
+HeaderFilterRegex: '(include/portal_api|src)/.*\.h$'
 FormatStyle: file
