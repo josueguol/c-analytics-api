@@ -10,6 +10,11 @@ static enum MHD_Result auth_database_error(struct MHD_Connection *connection, co
                                       message);
 }
 
+static enum MHD_Result auth_serialization_error(struct MHD_Connection *connection) {
+    return portal_http_response_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                      "serialization_error", "Could not build the response.");
+}
+
 enum MHD_Result portal_http_route_register(PortalHttpContext *context,
                                            struct MHD_Connection *connection,
                                            struct json_object *json) {
@@ -62,21 +67,27 @@ enum MHD_Result portal_http_route_register(PortalHttpContext *context,
                       : "Could not create the account.");
         goto cleanup;
     }
+    if (portal_database_result_row_count(database_result) != 1U) {
+        result = auth_database_error(connection, "Could not create the account.");
+        goto cleanup;
+    }
     response = json_object_new_object();
     if (response == NULL) {
         result = MHD_NO;
         goto cleanup;
     }
-    json_object_object_add(
-        response, "message",
-        json_object_new_string("Account created. Confirm it before signing in."));
-    json_object_object_add(
-        response, "confirmation_expires_at",
-        json_object_new_string(portal_database_result_value(database_result, 0U, 1U)));
-    if (portal_config_exposes_confirmation_token(context->config)) {
-        json_object_object_add(
-            response, "confirmation_token",
-            json_object_new_string(portal_database_result_value(database_result, 0U, 0U)));
+    if (!portal_http_json_add_string(response, "message",
+                                     "Account created. Confirm it before signing in.") ||
+        !portal_http_json_add_string(response, "confirmation_expires_at",
+                                     portal_database_result_value(database_result, 0U, 1U))) {
+        result = auth_serialization_error(connection);
+        goto cleanup;
+    }
+    if (portal_config_exposes_confirmation_token(context->config) &&
+        !portal_http_json_add_string(response, "confirmation_token",
+                                     portal_database_result_value(database_result, 0U, 0U))) {
+        result = auth_serialization_error(connection);
+        goto cleanup;
     }
     result = portal_http_response_json(connection, MHD_HTTP_CREATED, response);
 
@@ -180,13 +191,14 @@ enum MHD_Result portal_http_route_login(PortalHttpContext *context,
         result = MHD_NO;
         goto cleanup;
     }
-    json_object_object_add(
-        response, "access_token",
-        json_object_new_string(portal_database_result_value(database_result, 0U, 0U)));
-    json_object_object_add(response, "token_type", json_object_new_string("Bearer"));
-    json_object_object_add(
-        response, "expires_at",
-        json_object_new_string(portal_database_result_value(database_result, 0U, 1U)));
+    if (!portal_http_json_add_string(response, "access_token",
+                                     portal_database_result_value(database_result, 0U, 0U)) ||
+        !portal_http_json_add_string(response, "token_type", "Bearer") ||
+        !portal_http_json_add_string(response, "expires_at",
+                                     portal_database_result_value(database_result, 0U, 1U))) {
+        result = auth_serialization_error(connection);
+        goto cleanup;
+    }
     result = portal_http_response_json(connection, MHD_HTTP_OK, response);
 
 cleanup:

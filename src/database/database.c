@@ -115,9 +115,16 @@ size_t portal_database_result_row_count(const PortalDatabaseResult *result) {
 
 const char *portal_database_result_value(const PortalDatabaseResult *result, size_t row,
                                          size_t column) {
+    int field_count = 0;
+
     if (result == NULL || result->result == NULL ||
-        row >= portal_database_result_row_count(result) ||
-        column >= (size_t)PQnfields(result->result)) {
+        row >= portal_database_result_row_count(result)) {
+        return NULL;
+    }
+    /* PQnfields devuelve int: convertirlo a size_t sin comprobar el signo
+       convertiria un -1 en SIZE_MAX y anularia la comprobacion de rango. */
+    field_count = PQnfields(result->result);
+    if (field_count < 0 || column >= (size_t)field_count) {
         return NULL;
     }
     return PQgetvalue(result->result, (int)row, (int)column);

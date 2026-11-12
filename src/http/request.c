@@ -1,5 +1,7 @@
 #include "http_internal.h"
 
+#include <ctype.h>
+#include <errno.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -100,4 +102,62 @@ const char *portal_http_json_optional_string(struct json_object *json, const cha
     }
     text = json_object_get_string(value);
     return strlen(text) <= maximum_length ? text : NULL;
+}
+
+bool portal_http_json_add_object(struct json_object *object, const char *key,
+                                 struct json_object *value) {
+    if (object == NULL || key == NULL || value == NULL) {
+        return false;
+    }
+    return json_object_object_add(object, key, value) == 0;
+}
+
+/* Agrega un valor recien creado: si no puede agregarse, se libera aqui mismo
+   para que no quede huerfano. */
+static bool http_json_add_new(struct json_object *object, const char *key,
+                              struct json_object *value) {
+    if (value == NULL) {
+        return false;
+    }
+    if (!portal_http_json_add_object(object, key, value)) {
+        json_object_put(value);
+        return false;
+    }
+    return true;
+}
+
+bool portal_http_json_add_string(struct json_object *object, const char *key, const char *text) {
+    if (text == NULL) {
+        return false;
+    }
+    return http_json_add_new(object, key, json_object_new_string(text));
+}
+
+bool portal_http_json_add_int64(struct json_object *object, const char *key, int64_t value) {
+    return http_json_add_new(object, key, json_object_new_int64(value));
+}
+
+bool portal_http_json_add_int64_text(struct json_object *object, const char *key,
+                                     const char *text) {
+    char *end = NULL;
+    long long value = 0;
+
+    /* strtoll ignora los espacios iniciales; aqui el texto viene de una columna
+       ::text y debe ser un entero completo, sin relleno. */
+    if (text == NULL || *text == '\0' || isspace((unsigned char)*text)) {
+        return false;
+    }
+    errno = 0;
+    value = strtoll(text, &end, 10);
+    if (errno != 0 || end == text || *end != '\0') {
+        return false;
+    }
+    return portal_http_json_add_int64(object, key, (int64_t)value);
+}
+
+bool portal_http_json_array_append(struct json_object *array, struct json_object *item) {
+    if (array == NULL || item == NULL) {
+        return false;
+    }
+    return json_object_array_add(array, item) == 0;
 }

@@ -25,6 +25,11 @@ static bool analytics_parse_range(const char *text, long fallback, long minimum,
     return true;
 }
 
+static enum MHD_Result analytics_serialization_error(struct MHD_Connection *connection) {
+    return portal_http_response_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                      "serialization_error", "Could not build the response.");
+}
+
 enum MHD_Result portal_http_route_top_content(PortalHttpContext *context,
                                               struct MHD_Connection *connection) {
     PortalAuthenticatedUser user = {0};
@@ -90,18 +95,25 @@ enum MHD_Result portal_http_route_top_content(PortalHttpContext *context,
             result = MHD_NO;
             goto cleanup;
         }
-        json_object_object_add(
-            item, "content_id",
-            json_object_new_string(portal_database_result_value(database_result, index, 0U)));
-        json_object_object_add(
-            item, "views",
-            json_object_new_int64(
-                strtoll(portal_database_result_value(database_result, index, 1U), NULL, 10)));
-        json_object_array_add(items, item);
+        if (!portal_http_json_add_string(
+                item, "content_id", portal_database_result_value(database_result, index, 0U)) ||
+            !portal_http_json_add_int64_text(
+                item, "views", portal_database_result_value(database_result, index, 1U)) ||
+            !portal_http_json_array_append(items, item)) {
+            json_object_put(item);
+            result = analytics_serialization_error(connection);
+            goto cleanup;
+        }
     }
-    json_object_object_add(response, "portal_key", json_object_new_string(portal));
-    json_object_object_add(response, "days", json_object_new_int64(days));
-    json_object_object_add(response, "items", items);
+    if (!portal_http_json_add_string(response, "portal_key", portal) ||
+        !portal_http_json_add_int64(response, "days", (int64_t)days)) {
+        result = analytics_serialization_error(connection);
+        goto cleanup;
+    }
+    if (!portal_http_json_add_object(response, "items", items)) {
+        result = analytics_serialization_error(connection);
+        goto cleanup;
+    }
     items = NULL;
     result = portal_http_response_json(connection, MHD_HTTP_OK, response);
 

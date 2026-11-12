@@ -5,6 +5,11 @@
 #include <json-c/json.h>
 #include <string.h>
 
+static enum MHD_Result favorite_serialization_error(struct MHD_Connection *connection) {
+    return portal_http_response_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                      "serialization_error", "Could not build the response.");
+}
+
 static bool favorite_has_authenticated_user(PortalHttpContext *context,
                                             struct MHD_Connection *connection,
                                             PortalAuthenticatedUser *user) {
@@ -44,10 +49,23 @@ enum MHD_Result portal_http_route_favorite_list(PortalHttpContext *context,
         goto cleanup;
     }
     for (index = 0U; index < portal_database_result_row_count(database_result); ++index) {
-        json_object_array_add(items, json_object_new_string(
-                                         portal_database_result_value(database_result, index, 0U)));
+        const char *key = portal_database_result_value(database_result, index, 0U);
+        struct json_object *item = key == NULL ? NULL : json_object_new_string(key);
+
+        if (item == NULL) {
+            result = favorite_serialization_error(connection);
+            goto cleanup;
+        }
+        if (!portal_http_json_array_append(items, item)) {
+            json_object_put(item);
+            result = favorite_serialization_error(connection);
+            goto cleanup;
+        }
     }
-    json_object_object_add(response, "items", items);
+    if (!portal_http_json_add_object(response, "items", items)) {
+        result = favorite_serialization_error(connection);
+        goto cleanup;
+    }
     items = NULL;
     result = portal_http_response_json(connection, MHD_HTTP_OK, response);
 

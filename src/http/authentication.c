@@ -7,9 +7,12 @@ PortalAuthStatus portal_http_authenticate(PortalHttpContext *context,
                                           struct MHD_Connection *connection,
                                           PortalAuthenticatedUser *user) {
     const char *authorization = NULL;
+    const char *identifier = NULL;
+    const char *email = NULL;
     const char *values[1] = {NULL};
     PortalDatabaseResult *result = NULL;
     PortalAuthStatus status = PORTAL_AUTH_INVALID;
+    int written = 0;
     static const char query[] =
         "SELECT u.id::text, u.email "
         "FROM auth_sessions s JOIN users u ON u.id=s.user_id "
@@ -34,10 +37,17 @@ PortalAuthStatus portal_http_authenticate(PortalHttpContext *context,
         portal_database_result_row_count(result) != 1U) {
         goto cleanup;
     }
-    if (snprintf(user->id, sizeof(user->id), "%s", portal_database_result_value(result, 0U, 0U)) <
-            0 ||
-        snprintf(user->email, sizeof(user->email), "%s",
-                 portal_database_result_value(result, 0U, 1U)) < 0) {
+    identifier = portal_database_result_value(result, 0U, 0U);
+    email = portal_database_result_value(result, 0U, 1U);
+    if (identifier == NULL || email == NULL) {
+        goto cleanup;
+    }
+    written = snprintf(user->id, sizeof(user->id), "%s", identifier);
+    if (written < 0 || (size_t)written >= sizeof(user->id)) {
+        goto cleanup;
+    }
+    written = snprintf(user->email, sizeof(user->email), "%s", email);
+    if (written < 0 || (size_t)written >= sizeof(user->email)) {
         goto cleanup;
     }
     status = PORTAL_AUTH_AUTHENTICATED;

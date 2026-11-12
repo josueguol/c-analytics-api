@@ -75,6 +75,36 @@ Los finales de línea deben permanecer en LF: `.gitattributes` lo garantiza pese
 a `core.autocrlf=true`. Un script guardado con CRLF falla en WSL y en Docker con
 `bad interpreter: /bin/sh^M`. Verificarlo con `git ls-files --eol scripts tests db`.
 
+#### AddressSanitizer y la entropía de ASLR
+
+Los kernels de WSL2 6.x usan `vm.mmap_rnd_bits=32`. Las versiones de
+`libsanitizer` anteriores a LLVM 18 —entre ellas la de Clang 14 del contenedor
+Debian bookworm— no pueden mapear su shadow memory con esa entropía y el binario
+muere con SIGSEGV antes de `main`, de forma **intermitente** (medido: 7 de cada
+30 arranques). Parece un fallo del código y no lo es.
+
+Solución, dentro de la distro afectada:
+
+```sh
+sudo sysctl -w vm.mmap_rnd_bits=28
+```
+
+En la VM de Docker Desktop, que no es accesible por `sudo`:
+
+```powershell
+docker run --rm --privileged debian:bookworm-slim sh -c 'echo 28 > /proc/sys/vm/mmap_rnd_bits'
+```
+
+Ambas son temporales y se pierden al reiniciar. Para hacerlo permanente en todas
+las distros WSL2, agregue a `%USERPROFILE%\.wslconfig` y ejecute `wsl --shutdown`:
+
+```ini
+[wsl2]
+kernelCommandLine = vm.mmap_rnd_bits=28
+```
+
+`scripts/check.sh` avisa cuando detecta este escenario.
+
 La primera inicialización de PostgreSQL ejecuta `db/init.sql`. Para reiniciar por completo los datos de desarrollo, ejecute `docker compose down -v` (esto elimina el volumen de la base).
 
 ## Autenticación y confirmación

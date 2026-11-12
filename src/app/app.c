@@ -8,10 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#if defined(_WIN32)
-#include <conio.h>
-#endif
-
 struct PortalApp {
     PortalConfig *config;
     PortalDatabase *database;
@@ -43,7 +39,6 @@ cleanup:
     return NULL;
 }
 
-#if !defined(_WIN32)
 static int app_block_shutdown_signals(sigset_t *shutdown_signals, sigset_t *previous_mask) {
     if (sigemptyset(shutdown_signals) != 0 || sigaddset(shutdown_signals, SIGINT) != 0 ||
         sigaddset(shutdown_signals, SIGTERM) != 0) {
@@ -51,27 +46,16 @@ static int app_block_shutdown_signals(sigset_t *shutdown_signals, sigset_t *prev
     }
     return sigprocmask(SIG_BLOCK, shutdown_signals, previous_mask);
 }
-#endif
 
 int portal_app_run(PortalApp *app) {
+    sigset_t shutdown_signals;
+    sigset_t previous_mask;
+    int received_signal = 0;
     int result = 1;
 
     if (app == NULL || app->http_server == NULL) {
         return result;
     }
-#if defined(_WIN32)
-    if (!portal_http_server_start(app->http_server)) {
-        return result;
-    }
-    (void)fprintf(stderr, "portal-api listening on port %u; press a key to stop\n",
-                  portal_config_port(app->config));
-    (void)_getch();
-    result = 0;
-#else
-    sigset_t shutdown_signals;
-    sigset_t previous_mask;
-    int received_signal = 0;
-
     if (app_block_shutdown_signals(&shutdown_signals, &previous_mask) != 0) {
         return result;
     }
@@ -88,7 +72,6 @@ cleanup:
     if (sigprocmask(SIG_SETMASK, &previous_mask, NULL) != 0) {
         result = 1;
     }
-#endif
     return result;
 }
 

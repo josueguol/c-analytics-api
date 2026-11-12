@@ -37,6 +37,11 @@ static PortalAuthStatus activity_load_actor(PortalHttpContext *context,
     return actor->status;
 }
 
+static enum MHD_Result activity_serialization_error(struct MHD_Connection *connection) {
+    return portal_http_response_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR,
+                                      "serialization_error", "Could not build the response.");
+}
+
 static enum MHD_Result activity_actor_error(struct MHD_Connection *connection,
                                             PortalAuthStatus authentication) {
     if (authentication == PORTAL_AUTH_INVALID) {
@@ -99,7 +104,8 @@ enum MHD_Result portal_http_route_activity(PortalHttpContext *context,
     values[6] = page_url == NULL ? "" : page_url;
     values[7] = data_text;
     database_result = portal_database_query(context->database, query, 8U, values);
-    if (portal_database_result_status(database_result) != PORTAL_DATABASE_RESULT_TUPLES) {
+    if (portal_database_result_status(database_result) != PORTAL_DATABASE_RESULT_TUPLES ||
+        portal_database_result_row_count(database_result) != 1U) {
         result = portal_http_response_error(connection, MHD_HTTP_INTERNAL_SERVER_ERROR,
                                             "database_error", "Could not record activity.");
         goto cleanup;
@@ -109,9 +115,11 @@ enum MHD_Result portal_http_route_activity(PortalHttpContext *context,
         result = MHD_NO;
         goto cleanup;
     }
-    json_object_object_add(response, "event_id",
-                           json_object_new_int64(strtoll(
-                               portal_database_result_value(database_result, 0U, 0U), NULL, 10)));
+    if (!portal_http_json_add_int64_text(response, "event_id",
+                                         portal_database_result_value(database_result, 0U, 0U))) {
+        result = activity_serialization_error(connection);
+        goto cleanup;
+    }
     result = portal_http_response_json(connection, MHD_HTTP_CREATED, response);
 
 cleanup:
@@ -235,12 +243,13 @@ enum MHD_Result portal_http_route_comment(PortalHttpContext *context,
         result = MHD_NO;
         goto cleanup;
     }
-    json_object_object_add(
-        response, "id",
-        json_object_new_string(portal_database_result_value(database_result, 0U, 0U)));
-    json_object_object_add(
-        response, "created_at",
-        json_object_new_string(portal_database_result_value(database_result, 0U, 1U)));
+    if (!portal_http_json_add_string(response, "id",
+                                     portal_database_result_value(database_result, 0U, 0U)) ||
+        !portal_http_json_add_string(response, "created_at",
+                                     portal_database_result_value(database_result, 0U, 1U))) {
+        result = activity_serialization_error(connection);
+        goto cleanup;
+    }
     result = portal_http_response_json(connection, MHD_HTTP_CREATED, response);
 
 cleanup:

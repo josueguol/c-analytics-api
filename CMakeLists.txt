@@ -74,6 +74,17 @@ add_executable(portal_validation_tests tests/test_validation.c)
 target_link_libraries(portal_validation_tests PRIVATE portal_common_flags portal_api_core)
 add_test(NAME portal_validation_tests COMMAND portal_validation_tests)
 
+# Los helpers JSON son internos del modulo http: la prueba usa su cabecera privada.
+add_executable(portal_http_json_tests tests/test_http_json.c)
+target_include_directories(portal_http_json_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src/http)
+target_link_libraries(portal_http_json_tests PRIVATE
+    portal_common_flags
+    portal_api_core
+    PkgConfig::MICROHTTPD
+    PkgConfig::JSON_C
+)
+add_test(NAME portal_http_json_tests COMMAND portal_http_json_tests)
+
 find_program(PORTAL_CLANG_FORMAT_EXECUTABLE NAMES clang-format)
 if(PORTAL_CLANG_FORMAT_EXECUTABLE)
     # Se descubren solas: agregar un archivo no exige actualizar una lista aparte.

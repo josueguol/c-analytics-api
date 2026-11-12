@@ -8,6 +8,7 @@
 #include <microhttpd.h>
 #include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #define PORTAL_HTTP_MAX_BODY_SIZE ((size_t)1024U * 1024U)
 #define PORTAL_HTTP_UUID_TEXT_LENGTH 36U
@@ -54,6 +55,38 @@ const char *portal_http_json_string(struct json_object *json, const char *key,
                                     size_t minimum_length, size_t maximum_length);
 const char *portal_http_json_optional_string(struct json_object *json, const char *key,
                                              size_t maximum_length);
+
+/**
+ * Agrega un valor ya existente.
+ *
+ * Ownership: en true object pasa a ser propietario de value; en false el
+ * llamador conserva la propiedad y debe liberarlo con json_object_put().
+ */
+bool portal_http_json_add_object(struct json_object *object, const char *key,
+                                 struct json_object *value);
+
+/**
+ * Constructores de respuesta. Rechazan text == NULL, comprueban la reserva de
+ * json-c y comprueban el retorno de json_object_object_add: si este falla, el
+ * valor recien creado se libera aqui en lugar de filtrarse.
+ *
+ * Ownership: en false no se agrego nada y no queda memoria viva.
+ */
+bool portal_http_json_add_string(struct json_object *object, const char *key, const char *text);
+bool portal_http_json_add_int64(struct json_object *object, const char *key, int64_t value);
+
+/**
+ * Igual que portal_http_json_add_int64, pero convirtiendo un entero en texto
+ * (tipicamente una columna ::text de PostgreSQL). Devuelve false si text es
+ * NULL, esta vacio, no es un entero completo o se sale del rango de int64_t.
+ */
+bool portal_http_json_add_int64_text(struct json_object *object, const char *key, const char *text);
+
+/**
+ * Ownership: en true el array toma posesion de item; en false el llamador
+ * conserva la posesion y debe liberarlo con json_object_put().
+ */
+bool portal_http_json_array_append(struct json_object *array, struct json_object *item);
 
 PortalAuthStatus portal_http_authenticate(PortalHttpContext *context,
                                           struct MHD_Connection *connection,

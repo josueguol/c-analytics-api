@@ -58,8 +58,11 @@ enum MHD_Result portal_http_response_error(struct MHD_Connection *connection, un
     if (json == NULL) {
         return MHD_NO;
     }
-    json_object_object_add(json, "error", json_object_new_string(code));
-    json_object_object_add(json, "message", json_object_new_string(message));
+    if (!portal_http_json_add_string(json, "error", code) ||
+        !portal_http_json_add_string(json, "message", message)) {
+        json_object_put(json);
+        return MHD_NO;
+    }
     result = portal_http_response_json(connection, status, json);
     json_object_put(json);
     json = NULL;
